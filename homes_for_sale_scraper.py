@@ -4,11 +4,11 @@ import time
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 import requests
-from selenium.common.exceptions import NoSuchElementException
+# from selenium.common.exceptions import NoSuchElementException
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.keys import Keys
+# from selenium.webdriver.common.keys import Keys
 
 
 class HomesForSaleScraper:
@@ -44,6 +44,12 @@ class HomesForSaleScraper:
                                                                                     'c11n-8-82-3__sc-yipmu-0 hiBOYq '
                                                                                     'property-card-link"]')]
         print(self.all_prices, self.all_addresses, self.all_listing_links)
+        if len(self.all_listing_links) == 0:
+            print("wait 3 seconds to run again...")
+            ua = UserAgent()
+            self.macbook_headers = {"User-Agent": ua.random}
+            time.sleep(3)
+            self.get_listings()
 
     def complete_google_forms(self):
         chrome_options = Options()
