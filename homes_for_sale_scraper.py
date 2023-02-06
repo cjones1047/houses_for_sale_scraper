@@ -2,6 +2,7 @@ import dotenv
 import os
 import time
 from bs4 import BeautifulSoup
+from fake_useragent import UserAgent
 import requests
 from selenium.common.exceptions import NoSuchElementException
 from selenium import webdriver
@@ -14,9 +15,13 @@ class HomesForSaleScraper:
 
     def __init__(self):
         dotenv.load_dotenv()
-        self.macbook_headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
+        proxy = os.getenv("PROXY")
+        self.proxies = {"http": f"http://{proxy}"}
+        ua = UserAgent()
+        self.macbook_headers = {"User-Agent": ua.random}
+        self.all_prices = None
+        self.all_addresses = None
+        self.all_listing_links = None
         self.driver = None
 
     def get_listings(self):
@@ -27,36 +32,34 @@ class HomesForSaleScraper:
                       "22%3A7%7D%5D%2C%22isMapVisible%22%3Atrue%2C%22filterState%22%3A%7B%22ah%22%3A%7B%22value%22%"
                       "3Atrue%7D%2C%22sort%22%3A%7B%22value%22%3A%22globalrelevanceex%22%7D%2C%22beds%22%3A%"
                       "7B%22min%22%3A4%7D%2C%22baths%22%3A%7B%22min%22%3A3%7D%7D%2C%22isListVisible%22%3Atrue%7D")
-        zillow_response = requests.get(url=zillow_url, headers=self.macbook_headers)
+        zillow_response = requests.get(url=zillow_url, headers=self.macbook_headers, proxies=self.proxies)
         zillow_response.raise_for_status()
+        time.sleep(1)
         zillow_page = BeautifulSoup(zillow_response.text, "html.parser")
-        # listing_class = "ListItem-c11n-8-82-3__sc-10e22w8-0 srp__hpnp3q-0 enEXBq with_constellation"
-        # all_listing_els = zillow_page.find_all(class_=listing_class)
-        all_prices = [price_el.text for price_el in zillow_page.select('span[data-test="property-card-price"]')]
-        all_addresses = [address_el.text for address_el in zillow_page.select('address[data-test='
-                                                                              '"property-card-addr"]')]
-        all_listing_links = [link_el['href'] for link_el in zillow_page.select('a[class="StyledPropertyCardDataArea-'
-                                                                               'c11n-8-82-3__sc-yipmu-0 hiBOYq '
-                                                                               'property-card-link"]')]
-        print(f"{len(all_prices)} prices")
-        print(all_prices)
-        print(f"{len(all_addresses)} addresses")
-        print(all_addresses)
-        print(f"{len(all_listing_links)} links")
-        print(all_listing_links)
+        self.all_prices = [price_el.text for price_el in zillow_page.select('span[data-test="property-card-price"]')]
+        self.all_addresses = [address_el.text for address_el in zillow_page.select('address[data-test='
+                                                                                   '"property-card-addr"]')]
+        self.all_listing_links = [link_el['href'] for link_el in zillow_page.select('a[class="StyledPropertyCard'
+                                                                                    'DataArea-'
+                                                                                    'c11n-8-82-3__sc-yipmu-0 hiBOYq '
+                                                                                    'property-card-link"]')]
+        print(self.all_prices, self.all_addresses, self.all_listing_links)
 
-    def complete_google_form(self):
-        # PROXY = "182.72.203.246"
-        # webdriver.DesiredCapabilities.FIREFOX['proxy'] = {
-        #     "httpProxy": PROXY,
-        #     "ftpProxy": PROXY,
-        #     "sslProxy": PROXY,
-        #     "proxyType": "MANUAL",
-        # }
+    def complete_google_forms(self):
         chrome_options = Options()
         chrome_options.add_experimental_option("detach", True)
-        chrome_options.page_load_strategy = 'eager'
-        # self.zip_code = input("Enter zip code to search:\n")
-        # while not self.zip_code.isdigit() or len(self.zip_code) != 5:
-        #     self.zip_code = input("Please enter valid zip code:\n")
         self.driver = webdriver.Chrome(chrome_options=chrome_options)
+        for index, value in enumerate(self.all_listing_links):
+            self.driver.get("https://forms.gle/vM3gCaPqhuHuDWcD9")
+            time.sleep(1)
+            address_input_el = self.driver.find_element(By.CSS_SELECTOR, 'input[aria-labelledby="i1"]')
+            address_input_el.click()
+            address_input_el.send_keys(self.all_addresses[index])
+            price_input_el = self.driver.find_element(By.CSS_SELECTOR, 'input[aria-labelledby="i5"]')
+            price_input_el.click()
+            price_input_el.send_keys(self.all_prices[index])
+            link_input_el = self.driver.find_element(By.CSS_SELECTOR, 'input[aria-labelledby="i9"]')
+            link_input_el.click()
+            link_input_el.send_keys(self.all_listing_links[index])
+            submit_button_el = self.driver.find_element(By.CSS_SELECTOR, 'span[class="NPEfkd RveJvd snByac"]')
+            submit_button_el.click()
